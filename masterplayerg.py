@@ -11,12 +11,23 @@ class LaskerMorris:
             18: [10, 19],  19: [16, 18, 20, 22],  20: [13, 19],
             21: [9, 22],  22: [19, 21, 23],  23: [14, 22]
         }
+
+        # List of all mills
+        self.mills = [
+        (0, 1, 2), (3, 4, 5), (6, 7, 8),  # Top row mills
+        (9, 10, 11), (12, 13, 14), (15, 16, 17),  # Middle row mills
+        (18, 19, 20), (21, 22, 23),  # Bottom row mills
+        (0, 9, 21), (3, 10, 18), (6, 11, 15),  # Left column mills
+        (1, 4, 7), (16, 19, 22),  # Middle column mills
+        (8, 12, 17), (5, 13, 20), (2, 14, 23)  # Right column mills
+        ]
+
         # Track pieces on the board (None = empty)
         self.positions = {i: None for i in range(24)}
         self.bluepieces = 10
         self.orangepieces = 10
 
-    def place_piece(self, position, player):
+    def place(self, position, player):
         # Places a piece for a player ('X' or 'O') if the position is empty.
         if player == 'X' and self.bluepieces > 0:
             if self.positions[position] is None:
@@ -30,7 +41,7 @@ class LaskerMorris:
                 return True
         return False
 
-    def move_piece(self, start, end, player):
+    def move(self, start, end, player):
         # Moves a piece if the move is valid.
         if self.positions[start] == player and self.positions[end] is None and end in self.board[start]:
             self.positions[start] = None
@@ -38,18 +49,20 @@ class LaskerMorris:
             return True
         return False
 
-    def display_board(self):
+    def display(self):
         # Displays the board state (simple textual representation).
         for i in range(24):
             print(self.positions[i] if self.positions[i] else ".", end=" ")
             if i % 3 == 2: 
                 print()
         print()
-    def evaluate_board(self, player):
+
+    def evaluate(self, player):
         # Evaluates the current state of the board
         score = 0
-        score += self.piece_count(player)
-        score += self.mobility(player)
+        score += self.piece_count(player) * 5
+        score += self.mobility(player) * 3
+        score += self.form_mill(player) * 8
         return score
 
     def piece_count(self, player):
@@ -70,18 +83,29 @@ class LaskerMorris:
 
         return place_moves + move_moves
     
+
     def form_mill(self, player):
-        print("Hello World")
-                        
+        p_mills = [] # List of mills player can complete
+
+        for mill in self.mills:
+            a, b, c = mill
+            pieces = [self.positions[a], self.positions[b], self.positions[c]]
+            if pieces.count(player) == 2 and pieces.count(None) == 1:
+                p_mills.append(pieces)
+
+        return len(p_mills)
+
+            
 
 
 
-    
+
 game = LaskerMorris()
-game.place_piece(0, 'X')
-game.place_piece(1, 'X')
-game.place_piece(21, 'X')
-game.display_board()
-game.form_mill('X')
+game.place(3, 'X')
+game.place(4, 'X')
+game.place(18, 'X')
+game.place(19, 'X')
+score = game.evaluate('X')
+print(score)
 
 
