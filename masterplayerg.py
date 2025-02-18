@@ -268,12 +268,12 @@ opponent = game.opponent(player)
 
 
 def test_move(depth, player):
-    p_move = game.best_move(2, player)
+    p_move = game.best_move(depth, player)
     if p_move[0] == "place":
         print("PLACE", i + 1, p_move, player)
+        game.place(p_move[1], player)
         print("X IN HAND:", game.bluepieces)
         print("O IN HAND:", game.orangepieces)
-        game.place(p_move[1], player)
         if game.mill_complete(player):
             capture = game.best_capture(player)
             print("MILL FORMED, CAPTURING POSITION:", capture)
@@ -289,7 +289,7 @@ def test_move(depth, player):
     game.display()
 
 
-for i in range(30):
+for i in range(6):
     if i % 2 == 0:
         test_move(3, player)
     else:
