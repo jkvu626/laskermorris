@@ -1,3 +1,5 @@
+import copy
+
 class LaskerMorris:
     def __init__(self):
         # Board positions as nodes with valid moves (graph adjacency list)
@@ -83,101 +85,95 @@ class LaskerMorris:
         # Returns the symbol of a position or a placeholder if empty.
         return self.positions[pos] if self.positions[pos] else "+"
 
-    def evaluate(self, player):
+    def evaluate(self, player, state):
         # Evaluates the current state of the board
         score = 0
-        score += self.piece_count(player) * 5
+        score += self.piece_count(player, state) * 5
         # print("Piece Count:", self.piece_count(player))
-        score += self.mobility(player)
+        score += self.mobility(player, state)
         # print(self.mobility(player))
-        score += self.form_mill(player) * 100
+        score += self.form_mill(player, state) * 100
         # print(self.form_mill(player))
         return score
 
-    def piece_count(self, player):
+    def piece_count(self, player, state):
         # Returns total piece count
-        on_board = sum(1 for pos in self.positions if self.positions[pos] == player)
+        on_board = sum(1 for pos in state if state[pos] == player)
         in_hand = self.count_hand(player)
         return on_board + in_hand
     
-    def mobility(self, player):
+    def mobility(self, player, state):
         # Returns number of available moves
         place_moves = 0 
         if self.count_hand(player) > 0:
-            place_moves = sum(1 for pos in self.positions if self.positions[pos] is None)  # Empty spots
-        move_moves = sum(1 for pos, piece in self.positions.items() if piece == player 
-                        for neighbor in self.board[pos] if self.positions[neighbor] is None) # Legal Adjacent Moves
+            place_moves = sum(1 for pos in state if state[pos] is None)  # Empty spots
+        move_moves = sum(1 for pos, piece in state.items() if piece == player 
+                        for neighbor in self.board[pos] if state[neighbor] is None) # Legal Adjacent Moves
 
         return place_moves + move_moves
     
-    def form_mill(self, player):
+    def form_mill(self, player, state):
         # Returns amount of mills a player can complete with a single move
         p_mills = [] # List of mills player can complete
 
         for mill in self.mills:
             a, b, c = mill
-            pieces = [self.positions[a], self.positions[b], self.positions[c]]
+            pieces = [state[a], state[b], state[c]]
             if pieces.count(player) == 2 and pieces.count(None) == 1:
                 p_mills.append(pieces)
 
         return len(p_mills)
 
-    def minimax(self, depth, alpha, beta, isMax, player):
-        if depth == 0 or self.terminal():
-            score = self.evaluate(player)
-            # print(f"Depth {depth} | Evaluating Board for {player}: {score}")
-            return score
-        if isMax:
-            best = -1000
-            for move in self.legal_moves(player):
-                mm_move = self.mm_move(move, player)
-                score = self.minimax(depth - 1, alpha, beta, False, self.opponent(player))
-                self.mm_undo(move, player, mm_move)
-                # print(f"Depth {depth} | Maximizing {player} | Move: {move} | Score: {score}")
-
-                best = max(best, score)
-                alpha = max(alpha, score)
-                if beta <= alpha:
-                    break
-            return best
-        else:
-            best = 1000
-            for move in self.legal_moves(player):
-                mm_move = self.mm_move(move, player)
-                score = self.minimax(depth - 1, alpha, beta, True, player)
-                self.mm_undo(move, player, mm_move)
-                # print(f"Depth {depth} | Minimizing {player} | Move: {move} | Score: {score}")
-
-                best = min(best, score)
-                beta = min(beta, score)
-                if beta <= alpha:
-                    break
-            return best
+    def minimax(self, depth, alpha, beta, isMax, player, state):
+        if depth == 0 or self.terminal(state):
+            return None, self.evaluate(player, state)
         
-    def best_move(self, max_depth, player):
-        b_score = -1000
         b_move = None
 
-        for depth in range(1, max_depth + 1):
-            for move in self.legal_moves(player):
-                mm_move = self.mm_move(move, player)
-                score = self.minimax(depth, -1000, 1000, False, player)
-                self.mm_undo(move, player, mm_move)
-                # print(f"Depth {depth} | Testing Move: {move} | Score: {score}")
+        if isMax:
+            b_score = -1000
+            for move in self.legal_moves(player, state):
+                mm_move = self.mm_move(move, player, state)
+                _, score = self.minimax(depth - 1, alpha, beta, False, self.opponent(player), state)
+                self.mm_undo(move, player, state, mm_move)
 
                 if score > b_score:
                     b_score = score
                     b_move = move
                 
-                if b_score == 1000:
-                    return b_move
+                alpha = max(alpha, b_score)
+                if beta <= alpha:
+                    break
+        else:
+            b_score = 1000
+            for move in self.legal_moves(player, state):
+                mm_move = self.mm_move(move, player, state)
+                _, score = self.minimax(depth - 1, alpha, beta, False, self.opponent(player), state)
+                self.mm_undo(move, player, state, mm_move)
+
+                if score < b_score:
+                    b_score = score
+                    b_move = move
+            
+                beta = min(beta, b_score)
+                if beta <= alpha:
+                    break
+        return b_move, b_score
+                
         
-        # print(f"Best Move Chosen: {b_move} with Score: {b_score}")        
+    def best_move(self, max_depth, player):
+        b_move = None
+        board_state = copy.copy(self.positions)
+        for depth in range(1, max_depth + 1):
+            move, _ = self.minimax(depth, -1000, 1000, True, player, board_state)
+            if move is not None:
+                b_move = move
+
         return b_move
         
     # Return boolean representing terminal state
-    def terminal(self):
-        return self.piece_count('X') < 3 or self.piece_count('O') < 3
+    def terminal(self, state):
+        return self.piece_count('X', state) < 3 or self.piece_count('O', state) < 3
     
     # Count pieces in players hand
     def count_hand(self, player):
@@ -187,75 +183,78 @@ class LaskerMorris:
             in_hand = self.orangepieces
         return in_hand
     
-    def legal_moves(self, player):
+    def legal_moves(self, player, state):
         # Return list of moves player can legally make
         moves = []
         in_hand = self.count_hand(player)
         # Placement Phase
         if in_hand > 0:
-            for pos in self.positions:
-                if self.positions[pos] == None:
+            for pos in state:
+                if state[pos] == None:
                     moves.append(("place", pos))
         # Movement Phase
-        elif self.piece_count(player) > 3:
-            for start in self.positions:
-                if self.positions[start] == player:
+        elif self.piece_count(player, state) > 3:
+            for start in state:
+                if state[start] == player:
                     for neighbor in self.board[start]:
-                        if self.positions[neighbor] == None:
+                        if state[neighbor] == None:
                             moves.append(("move", start, neighbor))
         # Flying Phase
         else: 
-            for start in self.positions:
-                if self.positions[start] == player:
-                    for end in self.positions:
-                        if self.positions[end] is None:
+            for start in state:
+                if state[start] == player:
+                    for end in state:
+                        if state[end] is None:
                             moves.append(("move", start, end)) 
         return moves
 
-    def mill_complete(self, player):
+    def mill_complete(self, player, state):
         for mill in self.mills:
             a, b, c = mill
-            pieces = [self.positions[a], self.positions[b], self.positions[c]]
+            pieces = [state[a], state[b], state[c]]
             if pieces.count(player) == 3:
                 return True
         return False
     
-    def mm_move(self, move, player):
+    def mm_move(self, move, player, state):
+        capture = None
         if move[0] == "place":
-            self.place(move[1], player)
-            if self.mill_complete(player):
-                capture = self.best_capture(player)
+            state[move[1]] = player
+            if player == "X":
+                self.bluepieces -= 1
+            else:
+                self.orangepieces -= 1
+            if self.mill_complete(player, state):
+                capture = self.best_capture(player, state)
                 if capture is not None:
-                    self.capture(capture, player)
-                    return capture
+                    state[capture] = None
         elif move[0] == "move":
-            self.move(move[1], move[2], player)
-            if self.mill_complete(player):
-                capture = self.best_capture(player)
+            state[move[1]] = None
+            state[move[2]] = player
+            if self.mill_complete(player, state):
+                capture = self.best_capture(player, state)
                 if capture is not None:
-                    self.capture(capture, player)
-                    return capture
-        return None
+                    state[capture] = None
+        return capture
     
-    def mm_undo(self, move, player, capture=None):
+    def mm_undo(self, move, player, state, capture=None):
         if move[0] == "place":
-            self.positions[move[1]] = None
+            state[move[1]] = None
             if player == "X":
                 self.bluepieces += 1
             else:
                 self.orangepieces += 1        
-            if capture:
-                self.positions[capture] = self.opponent(player)
         elif move[0] == "move":
-            self.positions[move[1]] = player
-            self.positions[move[2]] = None
-            if capture:
-                self.positions[capture] = self.opponent(player)
+            state[move[1]] = player
+            state[move[2]] = None
+        if capture is not None and state[capture] is None:
+            state[capture] = self.opponent(player)
 
-    def best_capture(self, player):
+
+    def best_capture(self, player, state):
         opponent = self.opponent(player)
-        for pos in self.positions:
-            if self.positions[pos] == opponent:
+        for pos in state:
+            if state[pos] == opponent:
                 return pos
         return None
 
@@ -274,26 +273,22 @@ def test_move(depth, player):
         game.place(p_move[1], player)
         print("X IN HAND:", game.bluepieces)
         print("O IN HAND:", game.orangepieces)
-        if game.mill_complete(player):
-            capture = game.best_capture(player)
+        if game.mill_complete(player, game.positions):
+            capture = game.best_capture(player, game.positions)
             print("MILL FORMED, CAPTURING POSITION:", capture)
             game.capture(capture, player)
     elif p_move[0] == "move":
         print("MOVE", i + 1, p_move, player)
         game.move(p_move[1], p_move[2], player) 
-        if game.mill_complete(player):
-            if game.mill_complete(player):
-                capture = game.best_capture(player)
-                print("MILL FORMED, CAPTURING POSITION:", capture)
-                game.capture(capture, player)
+        if game.mill_complete(player, game.positions):
+            capture = game.best_capture(player, game.positions)
+            print("MILL FORMED, CAPTURING POSITION:", capture)
+            game.capture(capture, player)
     game.display()
 
 
-for i in range(6):
+for i in range(25):
     if i % 2 == 0:
         test_move(3, player)
     else:
         test_move(3, opponent)
-
-
-    
