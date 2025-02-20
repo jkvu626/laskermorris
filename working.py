@@ -1,4 +1,5 @@
 import copy
+import sys
 
 class LaskerMorris:
     def __init__(self):
@@ -29,9 +30,8 @@ class LaskerMorris:
         self.bluepieces = 10
         self.orangepieces = 10
 
-    def opponent(self, player):
-        return 'X' if player == 'O' else 'O'
-    
+
+    # Board Interactions #
     def place(self, position, player):
         # Places a piece for a player ('X' or 'O') if the position is empty.
         if player == 'X' and self.bluepieces > 0:
@@ -59,42 +59,17 @@ class LaskerMorris:
             self.positions[pos] = None
             return True
         return False
-
-    def display(self):
-        board_layout = [
-            f"{self.get_symbol("a7")}--------{self.get_symbol("d7")}--------{self.get_symbol("g7")}",
-            f"|        |        |",
-            f"|  {self.get_symbol("b6")}-----{self.get_symbol("d6")}-----{self.get_symbol("f6")}  |",
-            f"|  |     |     |  |",
-            f"|  |  {self.get_symbol("c5")}--{self.get_symbol("d5")}--{self.get_symbol("e5")}  |  |",
-            f"|  |  |     |  |  |",
-            f"{self.get_symbol("a4")}--{self.get_symbol("b4")}--{self.get_symbol("c4")}     {self.get_symbol("e4")}--{self.get_symbol("f4")}--{self.get_symbol("g4")}",
-            f"|  |  |     |  |  |",
-            f"|  |  {self.get_symbol("c3")}--{self.get_symbol("d3")}--{self.get_symbol("e3")}  |  |",
-            f"|  |     |     |  |",
-            f"|  {self.get_symbol("b2")}-----{self.get_symbol("d2")}-----{self.get_symbol("f2")}  |",
-            f"|        |        |",
-            f"{self.get_symbol("a1")}--------{self.get_symbol("d1")}--------{self.get_symbol("g1")}",
-        ]
-
-        for line in board_layout:
-            print(line)
-        print()
-
-    def get_symbol(self, position):
-        # Returns the symbol of a position or a placeholder if empty.
-        return self.positions.get(position, "+")
+    # Board Interactions #
 
 
+    # Evaluation Function and Evaluation Helpers # 
     def evaluate(self, player, state):
         # Evaluates the current state of the board
         score = 0
         score += self.piece_count(player, state) * 5
-        # print("Piece Count:", self.piece_count(player))
         score += self.mobility(player, state)
-        # print(self.mobility(player))
         score += self.form_mill(player, state) * 100
-        # print(self.form_mill(player))
+        score += self.trap_opponent(player, state) * 30
         return score
 
     def piece_count(self, player, state):
@@ -113,6 +88,19 @@ class LaskerMorris:
 
         return place_moves + move_moves
     
+    def trap_opponent(self, player, state):
+        # Identify if an opponent's piece has no legal moves
+        # Returns number of opponent pieces that are completely immobile
+        opponent = self.opponent(player)
+        trapped_pieces = 0
+
+        for pos, piece in state.items():
+            if piece == opponent:
+                if all(state[neighbor] is not None for neighbor in self.board[pos]):  # No available moves
+                    trapped_pieces += 1
+
+        return trapped_pieces
+    
     def form_mill(self, player, state):
         # Returns amount of mills a player can complete with a single move
         p_mills = [] # List of mills player can complete
@@ -124,17 +112,46 @@ class LaskerMorris:
                 p_mills.append(pieces)
 
         return len(p_mills)
+    # Evaluation Function and Evaluation Helpers # 
 
+
+    # Calculate Best Move / Minimax / Minimax Helpers #
+    def best_move(self, max_depth, player):
+        # Return the best move as a string compatible with referee (xx, xx, xx)
+        b_move = None
+        board_state = copy.copy(self.positions)
+        # Iterate depth for minimax until max_depth - Iterative Deepening
+        for depth in range(1, max_depth + 1):
+            move, _ = self.minimax(depth, -1000, 1000, True, player, board_state)
+            if move is not None:
+                b_move = move
+        
+        capture = self.check_capture(b_move, player)
+        if capture != "r0":
+            self.capture(capture, player)
+        # Format string for referee
+        if b_move[0] == "place":
+            move_str = f"{'h1' if player == 'X' else 'h2'} {b_move[1]} {self.check_capture(b_move, player)}"
+        elif b_move[0] == "move":
+            move_str = f"{b_move[1]} {b_move[2]} {self.check_capture(b_move, player)}"
+
+        return move_str
+    
     def minimax(self, depth, alpha, beta, isMax, player, state):
-        if depth == 0 or self.terminal(state):
+        # Return the best move and the best score as a tuple: (best_move, best_score)
+
+        if depth == 0 or self.terminal(state): # If at end of recursion (depth 0) or terminal state, return evaluation of board state
             return None, self.evaluate(player, state)
         
         b_move = None
 
+        # Maximizer (player)
         if isMax:
             b_score = -1000
-            for move in self.legal_moves(player, state):
+            # For every legal move, calculate score of board state
+            for move in self.legal_moves(player, state): 
                 mm_move = self.mm_move(move, player, state)
+                # Recursively call minimax until depth 0 or terminal state. Propagate best score upwards
                 _, score = self.minimax(depth - 1, alpha, beta, False, self.opponent(player), state)
                 self.mm_undo(move, player, state, mm_move)
 
@@ -145,6 +162,7 @@ class LaskerMorris:
                 alpha = max(alpha, b_score)
                 if beta <= alpha:
                     break
+        # Minimizer (opponent)
         else:
             b_score = 1000
             for move in self.legal_moves(player, state):
@@ -160,56 +178,139 @@ class LaskerMorris:
                 if beta <= alpha:
                     break
         return b_move, b_score
-                
-        
-    def best_move(self, max_depth, player):
-        b_move = None
-        board_state = copy.copy(self.positions)
-        for depth in range(1, max_depth + 1):
-            move, _ = self.minimax(depth, -1000, 1000, True, player, board_state)
-            if move is not None:
-                b_move = move
+    
+    def mm_move(self, move, player, state):
+        # Make move for minimax search: move = ('place/move', position, position2 - only for a move)
+        capture = None
+        if move[0] == "place": # Check for a place
+            state[move[1]] = player # Place piece in given position
+            # Take piece out of hand
+            if player == "X":
+                self.bluepieces -= 1
+            else:
+                self.orangepieces -= 1
+            # Check if move completed a mill
+            if self.mill_complete(player, state):
+                # Set capture to the position of the best opponent piece to remove (currently just 1st available capture)
+                capture = self.best_capture(player, state)
+                state[capture] = None # Remove the captured piece from the board
+        elif move[0] == "move": # Check for a move 
+            # Set start position to None, set end position to player
+            state[move[1]] = None
+            state[move[2]] = player
+            if self.mill_complete(player, state):
+                # Same capture logic as above
+                capture = self.best_capture(player, state)
+                state[capture] = None
+        return capture
+    
+    def mm_undo(self, move, player, state, capture):
+        # Undo mm_move in minimax search: move = ('place/move', position, position2 - only for a move)
+        if move[0] == "place": # Check for a place 
+            state[move[1]] = None # Undo move
+            # Restore used pieces
+            if player == "X": 
+                self.bluepieces += 1
+            else:
+                self.orangepieces += 1        
+        elif move[0] == "move": # Check for a move 
+            # Return start position to player, reset end position
+            state[move[1]] = player 
+            state[move[2]] = None
+        # If piece was captured, restore piece
+        if capture is not None and state[capture] is None:
+            state[capture] = self.opponent(player)
+    # Calculate Best Move / Minimax / Minimax Helpers #
 
-        return b_move
+
+    # Gameplay Loop #
+    def play(self, depth):
+        player_color = sys.stdin.readline().strip()
+        player = "X" if player_color == "blue" else "O"
+        opponent = self.opponent(player)
+
+        # Make the first move for blue
+        if player_color == "blue":
+            p_move = self.best_move(depth, player).split()
+            self.apply_move(' '.join(p_move), player)
+            print(' '.join(p_move), flush=True)
+
+        # Main play loop
+        while True:
+            try:
+                line = sys.stdin.readline().strip()
+
+                if line.startswith("END:"):
+                    print(line, flush=True)
+                    break
+
+                if line:
+                    if self.apply_move(line, opponent):
+                        p_move = self.best_move(depth, player).split()
+                        self.apply_move(' '.join(p_move), player)
+                        print(' '.join(p_move), flush=True)
+                    else:
+                        print(f"Invalid move received: {line}", file=sys.stderr)
+                        break
+
+            except EOFError:
+                break
+
+    def apply_move(self, move, player):
+        parts = move.split()
+        if len(parts) == 3:
+            if parts[0].startswith("h"):
+                return self.place(parts[1], player)
+            else:
+                return self.move(parts[0], parts[1], player)
+        return False
+    # Gameplay Loop #
+
+                    
+    # Helper Functions
+    def opponent(self, player):
+        # Return opposite player (X -> O) (O -> X)
+        return 'X' if player == 'O' else 'O'
         
-    # Return boolean representing terminal state
     def terminal(self, state):
+        # Return boolean representing terminal state
         return self.piece_count('X', state) < 3 or self.piece_count('O', state) < 3
     
-    # Count pieces in players hand
     def count_hand(self, player):
+        # Count pieces in players hand
         if player == 'X':
             in_hand = self.bluepieces
         else: 
             in_hand = self.orangepieces
         return in_hand
     
-    def legal_moves(self, player, state):
+    def legal_moves(self, player, state): # Technically Incorrect: Only two phases in Lasker Morris REVISIT LATER
         # Return list of moves player can legally make
         moves = []
         in_hand = self.count_hand(player)
-        # Placement Phase
+        # Initial Phase
         if in_hand > 0:
             for pos in state:
                 if state[pos] == None:
                     moves.append(("place", pos))
-        # Movement Phase
-        elif self.piece_count(player, state) > 3:
+        # Moving Phase
+        else:
             for start in state:
                 if state[start] == player:
                     for neighbor in self.board[start]:
                         if state[neighbor] == None:
                             moves.append(("move", start, neighbor))
         # Flying Phase
-        else: 
+        if self.piece_count(player, state) == 3:
             for start in state:
                 if state[start] == player:
                     for end in state:
                         if state[end] is None:
-                            moves.append(("move", start, end)) 
+                            moves.append(("move", start, end))
         return moves
-
+    
     def mill_complete(self, player, state):
+        # Check array of possible mills for complete mill
         for mill in self.mills:
             a, b, c = mill
             pieces = [state[a], state[b], state[c]]
@@ -217,79 +318,28 @@ class LaskerMorris:
                 return True
         return False
     
-    def mm_move(self, move, player, state):
-        capture = None
+    def check_capture(self, move, player):
+        board_copy = copy.copy(self.positions)
         if move[0] == "place":
-            state[move[1]] = player
-            if player == "X":
-                self.bluepieces -= 1
-            else:
-                self.orangepieces -= 1
-            if self.mill_complete(player, state):
-                capture = self.best_capture(player, state)
-                if capture is not None:
-                    state[capture] = None
-        elif move[0] == "move":
-            state[move[1]] = None
-            state[move[2]] = player
-            if self.mill_complete(player, state):
-                capture = self.best_capture(player, state)
-                if capture is not None:
-                    state[capture] = None
-        return capture
-    
-    def mm_undo(self, move, player, state, capture=None):
-        if move[0] == "place":
-            state[move[1]] = None
-            if player == "X":
-                self.bluepieces += 1
-            else:
-                self.orangepieces += 1        
-        elif move[0] == "move":
-            state[move[1]] = player
-            state[move[2]] = None
-        if capture is not None and state[capture] is None:
-            state[capture] = self.opponent(player)
-
+            board_copy[move[1]] = player
+        elif move[0] == 'move':
+            board_copy[move[1]] = None
+            board_copy[move[2]] = player
+        
+        if self.mill_complete(player, board_copy):
+            return self.best_capture(player, board_copy)
+        else:
+            return "r0"
 
     def best_capture(self, player, state):
+        # WORK IN PROGRESS - should return position of best piece for player to capture
         opponent = self.opponent(player)
         for pos in state:
             if state[pos] == opponent:
                 return pos
         return None
+    # Helper Functions #    
 
-        
-        
-game = LaskerMorris()
-
-player = "X"
-opponent = game.opponent(player)
-
-
-def test_move(depth, player):
-    p_move = game.best_move(depth, player)
-    if p_move[0] == "place":
-        print("PLACE", i + 1, p_move, player)
-        game.place(p_move[1], player)
-        print("X IN HAND:", game.bluepieces)
-        print("O IN HAND:", game.orangepieces)
-        if game.mill_complete(player, game.positions):
-            capture = game.best_capture(player, game.positions)
-            print("MILL FORMED, CAPTURING POSITION:", capture)
-            game.capture(capture, player)
-    elif p_move[0] == "move":
-        print("MOVE", i + 1, p_move, player)
-        game.move(p_move[1], p_move[2], player) 
-        if game.mill_complete(player, game.positions):
-            capture = game.best_capture(player, game.positions)
-            print("MILL FORMED, CAPTURING POSITION:", capture)
-            game.capture(capture, player)
-    game.display()
-
-
-for i in range(25):
-    if i % 2 == 0:
-        test_move(3, player)
-    else:
-        test_move(3, opponent)
+if __name__ == "__main__":
+    game = LaskerMorris()
+    game.play(3)
