@@ -65,6 +65,11 @@ class LaskerMorris:
     # Evaluation Function and Evaluation Helpers # 
     def evaluate(self, player, state):
         # Evaluates the current state of the board
+        if self.terminal(state):
+            if self.piece_count(player, state) < 3:  # Loss condition
+                return -1000
+            if self.piece_count(self.opponent(player), state) < 3:  # Win condition
+                return 1000
         score = 0
         score += self.piece_count(player, state) * 5
         score += self.mobility(player, state) * 2
@@ -309,14 +314,14 @@ class LaskerMorris:
 
         # Moving Phase and Flying Phase
         else:
-            can_fly = self.piece_count(player, state) == 3  # Can "fly" if only 3 pieces left
+            can_fly = self.piece_count(player, state) == 3  # Can fly if only 3 pieces left
 
             for start in state:
                 if state[start] == player:  # Find player's pieces
                     possible_moves = state.keys() if can_fly else self.board[start]  # Fly anywhere or move adjacently
                     
                     for end in possible_moves:
-                        if state[end] is None:  # Empty destination
+                        if state[end] is None:
                             temp_state = state.copy()
                             temp_state[start] = None
                             temp_state[end] = player
@@ -349,21 +354,21 @@ class LaskerMorris:
             return "r0"
 
     def best_capture(self, player, state):
-        # Select the best opponent piece to capture when forming a mill.
+        # Select the best opponent piece to capture when forming a mill
         opponent = self.opponent(player)
-        candidate_pieces = []  # Stores pieces that can be captured
+        candidate_pieces = []
 
         # Identify opponent pieces that are not in mills
         for pos in state:
             if state[pos] == opponent:
-                if not self.part_of_mill(pos, state, opponent):  # Prefer non-mill pieces
+                if not self.part_of_mill(pos, state, opponent):
                     candidate_pieces.append((pos, self.mobility(opponent, state)))
 
-        # If there are non-mill pieces, prioritize those that limit the opponent's mobility
+        # Prioritize those that limit the opponent's mobility
         if candidate_pieces:
-            return min(candidate_pieces, key=lambda x: x[1])[0]  # Pick piece that most reduces opponent mobility
+            return min(candidate_pieces, key=lambda x: x[1])[0]
 
-        # If all opponent pieces are in mills, remove the most disruptive piece
+        # Remove the most disruptive piece
         candidate_pieces = [(pos, self.mobility(opponent, state)) for pos in state if state[pos] == opponent]
         return min(candidate_pieces, key=lambda x: x[1])[0] if candidate_pieces else None
 
@@ -373,7 +378,7 @@ class LaskerMorris:
         for mill in self.mills:
             if pos in mill:
                 pieces = [state[p] for p in mill]
-                if pieces.count(player) == 3:  # The entire mill is formed
+                if pieces.count(player) == 3:
                     return True
         return False
 

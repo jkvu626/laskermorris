@@ -5,7 +5,12 @@ Documentation
 2. Instructions on compiling and running your program.
 - To compile and run the program we used cs4341-referee laskermorris -p1 "python masterplayerg.py" -p2 "python masterplayerg.py" --visual --log
 3. The utility function that your program uses.
-- The utility function 
+- The utility function:
+        if self.terminal(state):
+            if self.piece_count(player, state) < 3:  # Loss condition
+                return -1000
+            if self.piece_count(self.opponent(player), state) < 3:  # Win condition
+                return 1000
 4. The evaluation function that your program uses.
 - The evaluation function looks at piece count (+5), mobility, mills formed (+50, this one is prioritezed), and trapping an opponent (+20).
 5. The heuristics and/or strategies that you employed to decide how to expand nodes of the minimax tree without exceeding your time limit.
