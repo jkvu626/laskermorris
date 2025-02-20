@@ -349,13 +349,34 @@ class LaskerMorris:
             return "r0"
 
     def best_capture(self, player, state):
-        # WORK IN PROGRESS - should return position of best piece for player to capture
+        # Select the best opponent piece to capture when forming a mill.
         opponent = self.opponent(player)
+        candidate_pieces = []  # Stores pieces that can be captured
+
+        # Identify opponent pieces that are not in mills
         for pos in state:
             if state[pos] == opponent:
-                return pos
-        return None
+                if not self.part_of_mill(pos, state, opponent):  # Prefer non-mill pieces
+                    candidate_pieces.append((pos, self.mobility(opponent, state)))
+
+        # If there are non-mill pieces, prioritize those that limit the opponent's mobility
+        if candidate_pieces:
+            return min(candidate_pieces, key=lambda x: x[1])[0]  # Pick piece that most reduces opponent mobility
+
+        # If all opponent pieces are in mills, remove the most disruptive piece
+        candidate_pieces = [(pos, self.mobility(opponent, state)) for pos in state if state[pos] == opponent]
+        return min(candidate_pieces, key=lambda x: x[1])[0] if candidate_pieces else None
+
     # Helper Functions #    
+    def part_of_mill(self, pos, state, player):
+        # Checks if the given position is part of an existing mill
+        for mill in self.mills:
+            if pos in mill:
+                pieces = [state[p] for p in mill]
+                if pieces.count(player) == 3:  # The entire mill is formed
+                    return True
+        return False
+
 
 if __name__ == "__main__":
     game = LaskerMorris()
