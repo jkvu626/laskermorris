@@ -111,12 +111,15 @@ class LaskerMorris:
             move, _ = self.minimax(depth, -1000, 1000, True, player, board_state)
             if move is not None:
                 b_move = move
-
+        
+        capture = self.check_capture(b_move, player)
+        if capture != "r0":
+            self.capture(capture, player)
         # Format string for referee
         if b_move[0] == "place":
-            move_str = f"{'h1' if player == 'X' else 'h2'} {b_move[1]} r0"
+            move_str = f"{'h1' if player == 'X' else 'h2'} {b_move[1]} {self.check_capture(b_move, player)}"
         elif b_move[0] == "move":
-            move_str = f"{b_move[1]} {b_move[2]} r0"
+            move_str = f"{b_move[1]} {b_move[2]} {self.check_capture(b_move, player)}"
 
         return move_str
     
@@ -267,7 +270,7 @@ class LaskerMorris:
             in_hand = self.orangepieces
         return in_hand
     
-    def legal_moves(self, player, state): # Technically Incorrect: Only two phases REVISIT LATER
+    def legal_moves(self, player, state): # Technically Incorrect: Only two phases in Lasker Morris REVISIT LATER
         # Return list of moves player can legally make
         moves = []
         in_hand = self.count_hand(player)
@@ -300,6 +303,19 @@ class LaskerMorris:
             if pieces.count(player) == 3:
                 return True
         return False
+    
+    def check_capture(self, move, player):
+        board_copy = copy.copy(self.positions)
+        if move[0] == "place":
+            board_copy[move[1]] = player
+        elif move[0] == 'move':
+            board_copy[move[1]] = None
+            board_copy[move[2]] = player
+        
+        if self.mill_complete(player, board_copy):
+            return self.best_capture(player, board_copy)
+        else:
+            return "r0"
 
     def best_capture(self, player, state):
         # WORK IN PROGRESS - should return position of best piece for player to capture
@@ -312,4 +328,4 @@ class LaskerMorris:
 
 if __name__ == "__main__":
     game = LaskerMorris()
-    game.play(4)
+    game.play(3)
