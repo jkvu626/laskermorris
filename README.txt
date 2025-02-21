@@ -1,7 +1,7 @@
 Documentation
 1. The names of the members of your group. A detailed description of what each teammate contributed to the project.
 - Grace Robinson and Jesse Vu worked together to implement minimax with alpha beta pruning as well as working on the evaluation functions. We also designed the game representation and worked on the legal moves and heuristic stuff to improve it.
-- Andrey S helped with some of the evaluation functions and debugging.
+- Andrey S.
 2. Instructions on compiling and running your program.
 - To compile and run the program we used cs4341-referee laskermorris -p1 "python masterplayerg.py" -p2 "python masterplayerg.py" --visual --log
 3. The utility function that your program uses.

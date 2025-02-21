@@ -1,5 +1,6 @@
 import copy
 import sys
+import time
 
 class LaskerMorris:
     def __init__(self):
@@ -29,6 +30,7 @@ class LaskerMorris:
         self.positions = {pos: None for pos in self.board.keys()}
         self.bluepieces = 10
         self.orangepieces = 10
+        self.time_limit = 5
 
 
     # Board Interactions #
@@ -144,6 +146,8 @@ class LaskerMorris:
     
     def minimax(self, depth, alpha, beta, isMax, player, state):
         # Return the best move and the best score as a tuple: (best_move, best_score)
+        start = time.time()
+        atime = self.time_limit * 0.95
 
         if depth == 0 or self.terminal(state): # If at end of recursion (depth 0) or terminal state, return evaluation of board state
             return None, self.evaluate(player, state)
@@ -155,6 +159,8 @@ class LaskerMorris:
             b_score = -1000
             # For every legal move, calculate score of board state
             for move in self.legal_moves(player, state): 
+                if time.time() - start > atime:
+                    break
                 mm_move = self.mm_move(move, player, state)
                 # Recursively call minimax until depth 0 or terminal state. Propagate best score upwards
                 _, score = self.minimax(depth - 1, alpha, beta, False, self.opponent(player), state)
