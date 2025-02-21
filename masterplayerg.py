@@ -117,9 +117,9 @@ class LaskerMorris:
             self.capture(capture, player)
         # Format string for referee
         if b_move[0] == "place":
-            move_str = f"{'h1' if player == 'X' else 'h2'} {b_move[1]} {self.check_capture(b_move, player)}"
+            move_str = f"{'h1' if player == 'X' else 'h2'} {b_move[1]} {capture}"
         elif b_move[0] == "move":
-            move_str = f"{b_move[1]} {b_move[2]} {self.check_capture(b_move, player)}"
+            move_str = f"{b_move[1]} {b_move[2]} {capture}"
 
         return move_str
     
@@ -176,7 +176,7 @@ class LaskerMorris:
             else:
                 self.orangepieces -= 1
             # Check if move completed a mill
-            if self.mill_complete(player, state):
+            if self.mill_complete(player, state, move):
                 # Set capture to the position of the best opponent piece to remove (currently just 1st available capture)
                 capture = self.best_capture(player, state)
                 state[capture] = None # Remove the captured piece from the board
@@ -184,7 +184,7 @@ class LaskerMorris:
             # Set start position to None, set end position to player
             state[move[1]] = None
             state[move[2]] = player
-            if self.mill_complete(player, state):
+            if self.mill_complete(player, state, move):
                 # Same capture logic as above
                 capture = self.best_capture(player, state)
                 state[capture] = None
@@ -295,24 +295,23 @@ class LaskerMorris:
                             moves.append(("move", start, end))
         return moves
     
-    def mill_complete(self, player, state):
+    def mill_complete(self, player, state, move):
         # Check array of possible mills for complete mill
         for mill in self.mills:
             a, b, c = mill
             pieces = [state[a], state[b], state[c]]
-            if pieces.count(player) == 3:
+            if pieces.count(player) == 3 and move[1] in mill:
                 return True
         return False
     
     def check_capture(self, move, player):
-        board_copy = copy.copy(self.positions)
+        board_copy = copy.deepcopy(self.positions)
         if move[0] == "place":
             board_copy[move[1]] = player
         elif move[0] == 'move':
             board_copy[move[1]] = None
             board_copy[move[2]] = player
-        
-        if self.mill_complete(player, board_copy):
+        if self.mill_complete(player, board_copy, move):
             return self.best_capture(player, board_copy)
         else:
             return "r0"
@@ -328,4 +327,4 @@ class LaskerMorris:
 
 if __name__ == "__main__":
     game = LaskerMorris()
-    game.play(3)
+    game.play(4)
